@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tank · Water Level</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0B1620">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1620;
+    --panel:#121F2B;
+    --panel-border:#1E3344;
+    --text:#E6EEF2;
+    --muted:#6B8494;
+    --water-deep:#0E7490;
+    --water-light:#22D3EE;
+    --low:#F59E0B;
+    --empty:#EF4444;
+    --ok:#34D399;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(34,211,238,0.06), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    display:flex;
+    justify-content:center;
+    padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px);
+  }
+  .app{
+    width:100%;
+    max-width:380px;
+    padding-top:18px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  /* ---------- header ---------- */
+  .eyebrow{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px;
+    font-weight:600;
+    margin:2px 0 0;
+    letter-spacing:-0.01em;
+  }
+  .pill{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--muted);
+    flex:none;
+  }
+  .dot.online{ background:var(--ok); box-shadow:0 0 0 0 rgba(52,211,153,0.6); animation:pulse 2s infinite; }
+  .dot.offline{ background:var(--empty); }
+  .dot.unknown{ background:var(--muted); }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(52,211,153,0.55); }
+    70%{ box-shadow:0 0 0 6px rgba(52,211,153,0); }
+    100%{ box-shadow:0 0 0 0 rgba(52,211,153,0); }
+  }
+
+  /* ---------- alert banner ---------- */
+  .alert{
+    display:none;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    border-radius:12px;
+    font-size:13.5px;
+    font-weight:500;
+    line-height:1.3;
+  }
+  .alert.show{ display:flex; }
+  .alert.low{ background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); color:#FBBF24; }
+  .alert.empty{ background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); color:#F87171; }
+  .alert .glyph{ font-size:18px; }
+
+  /* ---------- LCD readout panel ---------- */
+  .lcd{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:18px 20px;
+    text-align:center;
+  }
+  .lcd .label{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .lcd .reading{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:54px;
+    line-height:1.05;
+    margin:4px 0 2px;
+    font-variant-numeric:tabular-nums;
+  }
+  .lcd .sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+
+  /* ---------- tank visual ---------- */
+  .stage{
+    display:flex;
+    justify-content:center;
+    padding:6px 0 2px;
+  }
+  .tube-wrap{
+    position:relative;
+    width:150px;
+    height:260px;
+    display:flex;
+    align-items:center;
+  }
+  .ticks{
+    position:absolute;
+    left:-30px; top:0; bottom:0;
+    width:24px;
+  }
+  .tick{
+    position:absolute;
+    right:0;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .tick .line{ width:7px; height:1px; background:var(--panel-border); }
+  .tick .num{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:var(--muted); }
+
+  .tube{
+    position:relative;
+    width:150px;
+    height:260px;
+    border-radius:20px;
+    border:3px solid var(--panel-border);
+    background:linear-gradient(180deg, #0E1A24, #0A1420);
+    overflow:hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  }
+  .tube::after{
+    /* glass highlight */
+    content:"";
+    position:absolute;
+    top:0; left:10px; bottom:0;
+    width:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
+    border-radius:10px;
+    pointer-events:none;
+  }
+  .water{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:0%;
+    background:linear-gradient(180deg, var(--water-light), var(--water-deep));
+    transition:height 1s ease;
+    overflow:hidden;
+  }
+  .wave{
+    position:absolute;
+    left:0; top:-9px;
+    width:200%;
+    height:18px;
+    background-repeat:repeat-x;
+    background-size:100px 18px;
+  }
+  .wave.back{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 18'%3E%3Cpath d='M0,9 C25,18 25,0 50,9 C75,18 75,0 100,9 L100,18 L0,18 Z' fill='%230E7490' fill-opacity='0.65'/%3E%3C/svg%3E");
+    animation: waveBack 6s linear infinite;
+    opacity:0.9;
+  }
+  .wave.front{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 18'%3E%3Cpath d='M0,9 C25,18 25,0 50,9 C75,18 75,0 100,9 L100,18 L0,18 Z' fill='%2322D3EE' fill-opacity='0.55'/%3E%3C/svg%3E");
+    animation: waveFront 3.6s linear infinite;
+  }
+  @keyframes waveBack{ from{ background-position-x:0; } to{ background-position-x:-100px; } }
+  @keyframes waveFront{ from{ background-position-x:0; } to{ background-position-x:100px; } }
+
+  .low-mark{
+    position:absolute;
+    left:0; right:0;
+    bottom:0%;
+    border-top:2px dashed var(--low);
+    z-index:3;
+  }
+  .low-mark .tag{
+    position:absolute;
+    right:6px;
+    top:-15px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:9px;
+    letter-spacing:0.08em;
+    color:var(--low);
+    background:rgba(11,22,32,0.85);
+    padding:1px 4px;
+    border-radius:4px;
+  }
+
+  /* ---------- status pill row ---------- */
+  .status-row{
+    display:flex;
+    justify-content:center;
+  }
+  .status-pill{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.03em;
+    padding:8px 16px;
+    border-radius:999px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+  }
+  .status-pill.ok{ color:var(--ok); }
+  .status-pill.low{ color:var(--low); }
+  .status-pill.empty{ color:var(--empty); }
+
+  footer{
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    padding-top:4px;
+  }
+
+  .cfg-warning{
+    background:rgba(245,158,11,0.1);
+    border:1px solid rgba(245,158,11,0.3);
+    color:#FBBF24;
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:12.5px;
+    line-height:1.4;
+    display:none;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <div class="eyebrow">Underground tank</div>
+      <h1>Water level</h1>
+    </div>
+    <div class="pill" id="connPill">
+      <span class="dot unknown" id="connDot"></span>
+      <span id="connLabel">Syncing</span>
+    </div>
+  </header>
+
+  <div class="cfg-warning" id="cfgWarning">
+    Set <code>FIREBASE_DB_URL</code> near the bottom of this file to your Firebase Realtime Database URL.
+  </div>
+
+  <div class="alert" id="alertBanner">
+    <span class="glyph" id="alertGlyph">⚠️</span>
+    <span id="alertText"></span>
+  </div>
+
+  <div class="lcd">
+    <div class="label">Water level</div>
+    <div class="reading"><span id="percentNum">--</span>%</div>
+    <div class="sub" id="distanceSub">distance —</div>
+  </div>
+
+  <div class="stage">
+    <div class="tube-wrap">
+      <div class="ticks">
+        <div class="tick" style="bottom:0%"><span class="line"></span><span class="num">0</span></div>
+        <div class="tick" style="bottom:25%"><span class="line"></span><span class="num">25</span></div>
+        <div class="tick" style="bottom:50%"><span class="line"></span><span class="num">50</span></div>
+        <div class="tick" style="bottom:75%"><span class="line"></span><span class="num">75</span></div>
+        <div class="tick" style="bottom:100%"><span class="line"></span><span class="num">100</span></div>
+      </div>
+      <div class="tube">
+        <div class="water" id="waterFill">
+          <div class="wave back"></div>
+          <div class="wave front"></div>
+        </div>
+        <div class="low-mark" id="lowMark">
+          <span class="tag">LOW</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-row">
+    <div class="status-pill ok" id="statusPill">—</div>
+  </div>
+
+  <footer id="lastSynced">waiting for first reading…</footer>
+
+</div>
+
+<script>
+  // ====== CONFIG — fill this in ======
+  // Your Firebase Realtime Database URL, e.g.
+  // "https://your-project-id-default-rtdb.firebaseio.com"
+  const FIREBASE_DB_URL = "https://tanky-level-default-rtdb.asia-southeast1.firebasedatabase.app";
+  // ====================================
+
+  const POLL_MS = 4000;     // how often the app checks Firebase
+  const STALE_MS = 15000;   // if the ESP hasn't reported in this long, call it offline
+
+  const els = {
+    connDot: document.getElementById('connDot'),
+    connLabel: document.getElementById('connLabel'),
+    percentNum: document.getElementById('percentNum'),
+    distanceSub: document.getElementById('distanceSub'),
+    waterFill: document.getElementById('waterFill'),
+    lowMark: document.getElementById('lowMark'),
+    statusPill: document.getElementById('statusPill'),
+    alertBanner: document.getElementById('alertBanner'),
+    alertGlyph: document.getElementById('alertGlyph'),
+    alertText: document.getElementById('alertText'),
+    lastSynced: document.getElementById('lastSynced'),
+    cfgWarning: document.getElementById('cfgWarning'),
+  };
+
+  let lastGoodFetch = null;
+
+  if (FIREBASE_DB_URL.includes("Tanky Level")) {
+    els.cfgWarning.style.display = 'block';
+  }
+
+  function setConn(state, label){
+    els.connDot.className = 'dot ' + state;
+    els.connLabel.textContent = label;
+  }
+
+  function render(data){
+    const now = Date.now();
+    const lastSeen = data.lastSeen || 0;
+    const espOnline = lastSeen > 0 && (now - lastSeen) < STALE_MS;
+
+    setConn(espOnline ? 'online' : 'offline', espOnline ? 'ESP online' : 'ESP offline');
+
+    const pct = typeof data.percent === 'number' ? Math.round(data.percent) : null;
+    const dist = typeof data.distance === 'number' ? data.distance : null;
+    const lowMarkPct = typeof data.lowMarkPercent === 'number' ? data.lowMarkPercent : null;
+
+    if (pct !== null){
+      els.percentNum.textContent = pct;
+      els.waterFill.style.height = pct + '%';
+    }
+    if (dist !== null){
+      els.distanceSub.textContent = 'distance ' + dist.toFixed(1) + ' cm';
+    }
+    if (lowMarkPct !== null){
+      els.lowMark.style.bottom = lowMarkPct + '%';
+    }
+
+    let statusClass = 'ok', statusText = 'Pani theek hai';
+    let showAlert = false, alertClass = '', alertGlyph = '', alertText = '';
+
+    if (data.empty){
+      statusClass = 'empty'; statusText = 'Pani khatam';
+      showAlert = true; alertClass = 'empty'; alertGlyph = '🚨'; alertText = 'Tank empty — pani khatam!';
+    } else if (data.low){
+      statusClass = 'low'; statusText = 'Pani kam hai';
+      showAlert = true; alertClass = 'low'; alertGlyph = '⚠️'; alertText = 'Low water level — pani kam hai.';
+    }
+
+    els.statusPill.className = 'status-pill ' + statusClass;
+    els.statusPill.textContent = statusText;
+
+    els.alertBanner.className = 'alert' + (showAlert ? ' show ' + alertClass : '');
+    if (showAlert){
+      els.alertGlyph.textContent = alertGlyph;
+      els.alertText.textContent = alertText;
+    }
+
+    lastGoodFetch = now;
+  }
+
+  function setSyncError(){
+    setConn('unknown', 'No connection');
+  }
+
+  async function poll(){
+    try {
+      const res = await fetch(FIREBASE_DB_URL + '/tank.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data) throw new Error('empty');
+      render(data);
+    } catch (err){
+      setSyncError();
+    }
+  }
+
+  function tickFooter(){
+    if (lastGoodFetch === null){
+      els.lastSynced.textContent = 'waiting for first reading…';
+      return;
+    }
+    const secs = Math.round((Date.now() - lastGoodFetch) / 1000);
+    els.lastSynced.textContent = 'synced ' + secs + 's ago';
+  }
+
+  poll();
+  setInterval(poll, POLL_MS);
+  setInterval(tickFooter, 1000);
+</script>
+</body>
+</html>
